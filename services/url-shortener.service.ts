@@ -1,5 +1,6 @@
 import { AppDataSource } from "../db/db.datasource";
 import { URLShortener } from "../models/url-shortener.model";
+import { Users } from "../models/users.model";
 
 class URLShortenerService {
   private repository;
@@ -96,7 +97,10 @@ class URLShortenerService {
     return shortcode;
   }
 
-  async createShortCode(long_url: string): Promise<string | null> {
+  async createShortCode(
+    long_url: string,
+    user_info: Users
+  ): Promise<string | null> {
     try {
       await this.connectDB();
       const new_short_code = await this.generateUniqueShortCode();
@@ -104,6 +108,7 @@ class URLShortenerService {
       const newUrl = this.repository.create({
         original_url: long_url,
         short_code: new_short_code,
+        user: user_info
       });
 
       await this.repository.save(newUrl);
