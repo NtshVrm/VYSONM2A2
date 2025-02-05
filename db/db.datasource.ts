@@ -1,5 +1,6 @@
 import { DataSource } from "typeorm";
 import { URLShortener } from "../models/url-shortener.model";
+import { Users } from "../models/users.model";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -9,7 +10,7 @@ export const AppDataSource = new DataSource({
   database: "neondb",
   synchronize: true,
 //   logging: true,
-  entities: [URLShortener],
+  entities: [URLShortener, Users],
   subscribers: [],
   migrations: [],
   ssl: {
