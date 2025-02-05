@@ -31,7 +31,7 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
           .status(400)
           .json({ statusCode: 400, error: "Short code is required." });
       }
-      const originalUrl = await URLShortenerManager.getOriginalURL(shortcode);
+      let originalUrl = await URLShortenerManager.handleRedirect(shortcode);
 
       return originalUrl
         ? res.status(302).redirect(originalUrl)
