@@ -3,21 +3,23 @@ import { URLShortener } from "../models/url-shortener.model";
 
 class URLShortenerService {
   private repository;
+  private dataSource;
   private shortCodeLength = 6;
   private characters =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   constructor() {
-    this.repository = AppDataSource.getRepository(URLShortener);
+    this.dataSource = AppDataSource;
+    this.repository = this.dataSource.getRepository(URLShortener);
   }
 
   async connectDB() {
     try {
-      if (!AppDataSource.isInitialized) {
+      if (!this.dataSource.isInitialized) {
         console.log("connecting to DB....");
-        await AppDataSource.initialize();
+        await this.dataSource.initialize();
       }
       console.log("DB Connected!");
-      return AppDataSource;
+      return this.dataSource;
     } catch (err) {
       console.log("Error connecting to DB", err);
     }
