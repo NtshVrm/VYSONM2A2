@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import express, { NextFunction, Request, Response } from "express";
 import URLShortenerManager from "./services/url-shortener.service";
+import UserManager from "./services/users.service";
 
 const app = express();
 app.use(express.json());
@@ -16,6 +17,15 @@ app.get("/", (req, res) => {
 app.get("/all", async (req, res, next) => {
   try {
     const allData = await URLShortenerManager.getAllUrls();
+    res.json(allData);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get("/users", async (req, res, next) => {
+  try {
+    const allData = await UserManager.getAllUsers();
     res.json(allData);
   } catch (err) {
     next(err);
@@ -58,9 +68,26 @@ app.post("/shorten", (req: Request, res: Response, next: NextFunction) => {
         });
       }
 
-      const newShortCode = await URLShortenerManager.createShortCode(long_url);
+      const apiKey = req.headers["api-key"] as string;
 
-      res.status(201).json({ statusCode: 201, short_code: newShortCode });
+      if (apiKey) {
+        const userInfo = await UserManager.getUserByApiKey(apiKey);
+        if (userInfo) {
+          const newShortCode = await URLShortenerManager.createShortCode(
+            long_url,
+            userInfo
+          );
+          res.status(201).json({ statusCode: 201, short_code: newShortCode });
+        } else {
+          res
+            .status(400)
+            .json({ statusCode: 400, error: "User does not exist." });
+        }
+      } else {
+        res
+          .status(400)
+          .json({ statusCode: 400, error: "API Key not provided." });
+      }
     } catch (err) {
       next(err);
     }
