@@ -129,6 +129,25 @@ class URLShortenerService {
     }
   }
 
+  async handleRedirect(short_code: string) {
+    try {
+      const long_url = await this.getOriginalURL(short_code);
+
+      if (long_url) {
+        const res = await this.repository.increment(
+          { original_url: long_url },
+          "visit_count",
+          1
+        );
+        if (res.affected && res.affected > 0) {
+          return long_url;
+        }
+      } else {
+        return null;
+      }
+    } catch (err) {}
+  }
+
   async deleteShortCode(short_code: string) {
     try {
       await this.connectDB();
