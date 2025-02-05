@@ -15,5 +15,8 @@ export class URLShortener {
   visit_count!: number;
 
   @CreateDateColumn({ type: "timestamp" })
+  last_accessed_at!: Date;
+
+  @CreateDateColumn({ type: "timestamp" })
   created_at!: Date;
 }
