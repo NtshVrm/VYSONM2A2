@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from "typeorm";
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  JoinColumn,
+  ManyToOne,
+} from "typeorm";
+import { Users } from "./users.model";
 
 @Entity("url_shortener")
 export class URLShortener {
@@ -19,4 +27,8 @@ export class URLShortener {
 
   @CreateDateColumn({ type: "timestamp" })
   created_at!: Date;
+  // Foreign key to the User entity
+  @ManyToOne(() => Users, (user) => user.urlShorteners, { nullable: false })
+  @JoinColumn({ name: "user_id" }) // Specify the column name in the database
+  user!: Users;
 }
