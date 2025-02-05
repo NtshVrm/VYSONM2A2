@@ -57,22 +57,10 @@ app.post("/shorten", (req: Request, res: Response, next: NextFunction) => {
           error: "Original long URL is required!",
         });
       }
-      const existingShortCode = await URLShortenerManager.checkUrlExists(
-        long_url
-      );
 
-      if (existingShortCode?.short_code) {
-        res.status(201).json({
-          statusCode: 201,
-          short_code: existingShortCode.short_code,
-        });
-      } else {
-        const newShortCode = await URLShortenerManager.createShortCode(
-          long_url
-        );
+      const newShortCode = await URLShortenerManager.createShortCode(long_url);
 
-        res.status(201).json({ statusCode: 201, short_code: newShortCode });
-      }
+      res.status(201).json({ statusCode: 201, short_code: newShortCode });
     } catch (err) {
       next(err);
     }
