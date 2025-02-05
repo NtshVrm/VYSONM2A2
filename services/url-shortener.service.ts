@@ -111,6 +111,21 @@ class URLShortenerService {
     }
   }
 
+  async findOneRow(short_code: string) {
+    try {
+      await this.connectDB();
+      const row = await this.repository.findOne({
+        where: {
+          short_code: short_code,
+        },
+      });
+
+      return row ? row : null;
+    } catch (err) {
+      throw new Error(`Error fetching find by one: ${(err as Error).message}`);
+    }
+  }
+
   async getOriginalURL(short_code: string): Promise<string | null> {
     try {
       await this.connectDB();
@@ -131,16 +146,16 @@ class URLShortenerService {
 
   async handleRedirect(short_code: string) {
     try {
-      const long_url = await this.getOriginalURL(short_code);
+      const row = await this.findOneRow(short_code);
 
-      if (long_url) {
-        const res = await this.repository.increment(
-          { original_url: long_url },
-          "visit_count",
-          1
-        );
+      if (row?.original_url) {
+        const res = await this.repository.update(row.id, {
+          visit_count: row.visit_count + 1,
+          last_accessed_at: new Date(),
+        });
+
         if (res.affected && res.affected > 0) {
-          return long_url;
+          return row.original_url;
         }
       } else {
         return null;
