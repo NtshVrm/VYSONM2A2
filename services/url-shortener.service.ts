@@ -108,7 +108,7 @@ class URLShortenerService {
       const newUrl = this.repository.create({
         original_url: long_url,
         short_code: new_short_code,
-        user: user_info
+        user: user_info,
       });
 
       await this.repository.save(newUrl);
@@ -118,14 +118,24 @@ class URLShortenerService {
     }
   }
 
-  async findOneRow(short_code: string) {
+  async findOneRow(short_code: string, user_info: Users) {
     try {
       await this.connectDB();
       const row = await this.repository.findOne({
         where: {
           short_code: short_code,
+          user: user_info,
         },
+        relations: ["user"],
       });
+
+      if (!row) {
+        return null;
+      }
+
+      if (row.deleted_at != null || row.expiry_date < new Date()) {
+        return null;
+      }
 
       return row ? row : null;
     } catch (err) {
@@ -151,11 +161,10 @@ class URLShortenerService {
     }
   }
 
-  async handleRedirect(short_code: string) {
+  async handleRedirect(short_code: string, user_info: Users) {
     try {
-      const row = await this.findOneRow(short_code);
-
-      if (row?.original_url) {
+      const row = await this.findOneRow(short_code, user_info);
+      if (row?.original_url && !row.deleted_at) {
         const res = await this.repository.update(row.id, {
           visit_count: row.visit_count + 1,
           last_accessed_at: new Date(),
@@ -170,13 +179,22 @@ class URLShortenerService {
     } catch (err) {}
   }
 
-  async deleteShortCode(short_code: string) {
+  async deleteShortCode(short_code: string, user_info: Users) {
     try {
       await this.connectDB();
-      const result = await this.repository.delete({ short_code });
 
-      // result.affected tells us how many rows were deleted
-      return result.affected === 0 ? null : short_code;
+      const row = await this.findOneRow(short_code, user_info);
+      if (row) {
+        const res = await this.repository.update(row.id, {
+          deleted_at: new Date(),
+        });
+
+        if (res.affected && res.affected > 0) {
+          return row.short_code;
+        }
+      } else {
+        return null;
+      }
     } catch (err) {
       throw new Error(`Error deleting short code: ${(err as Error).message}`);
     }
