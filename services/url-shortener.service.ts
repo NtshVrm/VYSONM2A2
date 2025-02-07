@@ -1,6 +1,7 @@
 import { AppDataSource } from "../db/db.datasource";
 import { URLShortener } from "../models/url-shortener.model";
 import { Users } from "../models/users.model";
+import UserManager from "./users.service";
 
 class URLShortenerService {
   private repository;
@@ -99,16 +100,18 @@ class URLShortenerService {
 
   async createShortCode(
     long_url: string,
-    user_info: Users
+    api_key: string
   ): Promise<string | null> {
     try {
       await this.connectDB();
       const new_short_code = await this.generateUniqueShortCode();
 
+      const userInfo = (await UserManager.getUserByApiKey(api_key)) as Users;
+
       const newUrl = this.repository.create({
         original_url: long_url,
         short_code: new_short_code,
-        user: user_info,
+        user: userInfo,
       });
 
       await this.repository.save(newUrl);
@@ -118,26 +121,23 @@ class URLShortenerService {
     }
   }
 
-  async findOneRow(short_code: string, user_info: Users) {
+  async findOneRow(short_code: string, api_key: string) {
     try {
       await this.connectDB();
+
       const row = await this.repository.findOne({
         where: {
           short_code: short_code,
-          user: user_info,
+          user: { api_key: api_key },
         },
         relations: ["user"],
       });
 
-      if (!row) {
+      if (!row || row.deleted_at != null || row.expiry_date < new Date()) {
         return null;
       }
 
-      if (row.deleted_at != null || row.expiry_date < new Date()) {
-        return null;
-      }
-
-      return row ? row : null;
+      return row;
     } catch (err) {
       throw new Error(`Error fetching find by one: ${(err as Error).message}`);
     }
@@ -161,9 +161,9 @@ class URLShortenerService {
     }
   }
 
-  async handleRedirect(short_code: string, user_info: Users) {
+  async handleRedirect(short_code: string, api_key: string) {
     try {
-      const row = await this.findOneRow(short_code, user_info);
+      const row = await this.findOneRow(short_code, api_key);
       if (row?.original_url && !row.deleted_at) {
         const res = await this.repository.update(row.id, {
           visit_count: row.visit_count + 1,
@@ -179,11 +179,11 @@ class URLShortenerService {
     } catch (err) {}
   }
 
-  async deleteShortCode(short_code: string, user_info: Users) {
+  async deleteShortCode(short_code: string, api_key: string) {
     try {
       await this.connectDB();
 
-      const row = await this.findOneRow(short_code, user_info);
+      const row = await this.findOneRow(short_code, api_key);
       if (row) {
         const res = await this.repository.update(row.id, {
           deleted_at: new Date(),
