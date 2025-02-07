@@ -164,19 +164,20 @@ class URLShortenerService {
   async handleRedirect(short_code: string, api_key: string) {
     try {
       const row = await this.findOneRow(short_code, api_key);
-      if (row?.original_url && !row.deleted_at) {
-        const res = await this.repository.update(row.id, {
-          visit_count: row.visit_count + 1,
-          last_accessed_at: new Date(),
-        });
 
-        if (res.affected && res.affected > 0) {
-          return row.original_url;
-        }
-      } else {
+      if (!row || row.deleted_at) {
         return null;
       }
-    } catch (err) {}
+
+      const res = await this.repository.update(row.id, {
+        visit_count: row.visit_count + 1,
+        last_accessed_at: new Date(),
+      });
+
+      return res.affected && res.affected > 0 ? row.original_url : null;
+    } catch (err) {
+      throw new Error(`Error redirecting: ${(err as Error).message}`);
+    }
   }
 
   async deleteShortCode(short_code: string, api_key: string) {
@@ -184,17 +185,15 @@ class URLShortenerService {
       await this.connectDB();
 
       const row = await this.findOneRow(short_code, api_key);
-      if (row) {
-        const res = await this.repository.update(row.id, {
-          deleted_at: new Date(),
-        });
-
-        if (res.affected && res.affected > 0) {
-          return row.short_code;
-        }
-      } else {
+      if (!row) {
         return null;
       }
+
+      const res = await this.repository.update(row.id, {
+        deleted_at: new Date(),
+      });
+
+      return res.affected && res.affected > 0 ? row.short_code : null;
     } catch (err) {
       throw new Error(`Error deleting short code: ${(err as Error).message}`);
     }
