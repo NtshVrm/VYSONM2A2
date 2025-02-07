@@ -27,6 +27,12 @@ export class URLShortener {
 
   @CreateDateColumn({ type: "timestamp" })
   created_at!: Date;
+
+  @CreateDateColumn({ type: "timestamp", nullable: true })
+  deleted_at!: Date;
+
+  @CreateDateColumn({ type: "timestamp", nullable: true })
+  expiry_date!: Date;
   // Foreign key to the User entity
   @ManyToOne(() => Users, (user) => user.urlShorteners, { nullable: false })
   @JoinColumn({ name: "user_id" }) // Specify the column name in the database
