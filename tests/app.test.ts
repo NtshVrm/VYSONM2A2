@@ -456,7 +456,7 @@ describe("POST /shorten-bulk", () => {
       .send({ long_urls: [] });
     expect(response.status).toBe(400);
     expect(response.body).toBeDefined();
-    expect(response.body.error).toBe("Original long URL's are required!");
+    expect(response.body.error).toBe("Original long URL is required!");
   });
 
   it("should return 400 if URLs array is not provided", async () => {
@@ -466,7 +466,7 @@ describe("POST /shorten-bulk", () => {
       .send({});
     expect(response.status).toBe(400);
     expect(response.body).toBeDefined();
-    expect(response.body.error).toBe("Original long URL's are required!");
+    expect(response.body.error).toBe("Original long URL is required!");
   });
 
   it("should successfully create multiple short codes", async () => {

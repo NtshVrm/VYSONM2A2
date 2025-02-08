@@ -12,9 +12,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
   (async () => {
     if (!apiKey) {
-      return res
-        .status(403)
-        .json({ statusCode: 403, error: "API key is required." });
+      return res.status(403).json(responseJson.apiKeyRequired);
     }
     const userInfo = await UserManager.getUserByApiKey(apiKey);
 
@@ -23,17 +21,14 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     }
 
     if (req.url == "/shorten-bulk" && userInfo.tier != "enterprise") {
-      return res.status(400).json({
-        statusCode: 400,
-        error: "You do not have access for this operation.",
-      });
+      return res.status(400).json(responseJson.accessDenied);
     }
     next();
   })();
 });
 
-app.get("/", (req, res) => {
-  res.send("Hello");
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: 200 });
 });
 
 app.get("/list", (req: Request, res: Response, next: NextFunction) => {
@@ -76,9 +71,7 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
       );
 
       if (redirectData.original_url && redirectData.expired) {
-        return res
-          .status(410)
-          .json({ status: 410, error: "Short code has expired!" });
+        return res.status(410).json(responseJson.shortCodeExpired);
       }
 
       if (
@@ -86,9 +79,7 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
         redirectData.password &&
         password == undefined
       ) {
-        return res
-          .status(403)
-          .json({ status: 403, error: "Needs a password to be accessed." });
+        return res.status(403).json(responseJson.needsPassword);
       }
 
       if (
@@ -96,9 +87,7 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
         redirectData.password &&
         password !== redirectData.password
       ) {
-        return res
-          .status(403)
-          .json({ status: 403, error: "The password is incorrect." });
+        return res.status(403).json(responseJson.incorrectPassword);
       }
 
       return redirectData.original_url
@@ -135,35 +124,22 @@ app.post("/shorten", (req: Request, res: Response, next: NextFunction) => {
       const apiKey = req.headers["api-key"] as string;
 
       if (!long_url) {
-        return res.status(400).json({
-          statusCode: 400,
-          error: "Original long URL is required!",
-        });
+        return res.status(400).json(responseJson.originalUrlRequired);
       }
 
       if (custom_code != null && custom_code == "") {
-        return res.status(400).json({
-          statusCode: 400,
-          error: "Custom Code cannot be empty!",
-        });
+        return res.status(400).json(responseJson.customCodeEmpty);
       }
 
       if (password != null && password == "") {
-        return res.status(400).json({
-          statusCode: 400,
-          error: "Password cannot be empty!",
-        });
+        return res.status(400).json(responseJson.passwordEmpty);
       }
 
       if (custom_code) {
         const exists =
           await URLShortenerManager.checkShortCodeExists(custom_code);
         if (exists) {
-          return res.status(400).json({
-            statusCode: 400,
-            error:
-              "Short code already exists, please try with a different code.",
-          });
+          return res.status(400).json(responseJson.shortCodeExists);
         }
       }
       const newShortCode = await URLShortenerManager.createShortCode(
@@ -204,10 +180,7 @@ app.put(
       }
 
       if (password != null && password == "") {
-        return res.status(400).json({
-          statusCode: 400,
-          error: "Password cannot be empty!",
-        });
+        return res.status(400).json(responseJson.passwordEmpty);
       }
 
       const apiKey = req.headers["api-key"] as string;
@@ -251,17 +224,11 @@ app.post("/shorten-bulk", (req: Request, res: Response, next: NextFunction) => {
       let batch: { original_url: string; short_code: string | null }[] = [];
 
       if (!long_urls || long_urls.length == 0) {
-        return res.status(400).json({
-          statusCode: 400,
-          error: "Original long URL's are required!",
-        });
+        return res.status(400).json(responseJson.originalUrlRequired);
       }
 
       if (password != null && password == "") {
-        return res.status(400).json({
-          statusCode: 400,
-          error: "Password cannot be empty!",
-        });
+        return res.status(400).json(responseJson.passwordEmpty);
       }
 
       batch = await Promise.all(
@@ -300,16 +267,11 @@ app.delete("/delete", (req: Request, res: Response, next: NextFunction) => {
       );
 
       if (deletedObj.short_code && deletedObj.expired) {
-        return res
-          .status(410)
-          .json({ status: 410, error: "Short code has expired!" });
+        return res.status(410).json(responseJson.shortCodeExpired);
       }
 
       return short_code == deletedObj.short_code
-        ? res.status(200).json({
-            statusCode: 200,
-            message: `${short_code} deleted successfully!`,
-          })
+        ? res.status(200).json(responseJson.deleteSuccess(short_code))
         : res.status(404).json(responseJson.shortCodeNotFound);
     } catch (err) {
       next(err);
