@@ -167,7 +167,7 @@ class URLShortenerService {
     try {
       const row = await this.findOneRow(short_code, api_key);
       if (!row || (row.expiry_date != null && row.expiry_date < new Date())) {
-        return null;
+        return { original_url: row?.original_url, expired: true };
       }
 
       const res = await this.repository.update(row.id, {
@@ -175,7 +175,9 @@ class URLShortenerService {
         last_accessed_at: new Date(),
       });
 
-      return res.affected && res.affected > 0 ? row.original_url : null;
+      return res.affected && res.affected > 0
+        ? { original_url: row?.original_url, expired: false }
+        : { original_url: null, expired: false };
     } catch (err) {
       throw new Error(`Error redirecting: ${(err as Error).message}`);
     }
@@ -187,14 +189,16 @@ class URLShortenerService {
 
       const row = await this.findOneRow(short_code, api_key);
       if (!row || (row.expiry_date != null && row.expiry_date < new Date())) {
-        return null;
+        return { short_code: row?.short_code, expired: true };
       }
 
       const res = await this.repository.update(row.id, {
         expiry_date: new Date(),
       });
 
-      return res.affected && res.affected > 0 ? row.short_code : null;
+      return res.affected && res.affected > 0
+        ? { short_code: row?.short_code, expired: false }
+        : { short_code: null, expired: true };
     } catch (err) {
       throw new Error(`Error deleting short code: ${(err as Error).message}`);
     }
