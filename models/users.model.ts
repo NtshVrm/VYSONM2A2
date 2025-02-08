@@ -18,6 +18,9 @@ export class Users {
   @Column({ type: "text", nullable: true })
   name!: string;
 
+  @Column({ type: "text", nullable: false, default: "hobby" })
+  tier!: string;
+
   @Column({ type: "text", unique: true, nullable: false })
   api_key!: string;
 
