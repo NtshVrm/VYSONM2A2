@@ -1,5 +1,5 @@
 export const responseJson = {
-  userNotFound: { statusCode: 400, error: "User does not exist." },
+  userNotFound: { statusCode: 404, error: "User does not exist." },
   shortCodeRequired: { statusCode: 400, error: "Short code is required." },
   shortCodeNotFound: {
     statusCode: 404,
