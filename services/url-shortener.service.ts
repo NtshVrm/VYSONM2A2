@@ -45,6 +45,20 @@ class URLShortenerService {
     }
   }
 
+  async checkShortCodeExists(custom_code: string) {
+    try {
+      await this.connectDB();
+      const existingShortCode = await this.repository.findOne({
+        where: { short_code: custom_code },
+        select: {
+          short_code: true,
+        },
+      });
+
+      return existingShortCode ? true : false;
+    } catch (err) {}
+  }
+
   async checkUrlExists(
     long_url: string
   ): Promise<{ short_code: string | null }> {
@@ -78,14 +92,7 @@ class URLShortenerService {
       try {
         await this.connectDB();
 
-        const existingCode = await this.repository.findOne({
-          where: {
-            short_code: shortcode,
-          },
-          select: {
-            short_code: true,
-          },
-        });
+        const existingCode = await this.checkShortCodeExists(shortcode);
 
         exists = !!existingCode;
       } catch (err) {
@@ -99,22 +106,35 @@ class URLShortenerService {
   }
 
   async createShortCode(
-    long_url: string,
+    dataObj: {
+      long_url: string;
+      expiry_date: string | null;
+      custom_code: string | null;
+    },
     api_key: string
   ): Promise<string | null> {
     try {
       await this.connectDB();
-      const new_short_code = await this.generateUniqueShortCode();
+
+      const new_short_code = dataObj.custom_code
+        ? dataObj.custom_code
+        : await this.generateUniqueShortCode();
 
       const userInfo = (await UserManager.getUserByApiKey(api_key)) as Users;
 
-      const newUrl = this.repository.create({
-        original_url: long_url,
-        short_code: new_short_code,
-        user: userInfo,
-      });
+      await this.repository.upsert(
+        {
+          original_url: dataObj.long_url,
+          expiry_date: dataObj.expiry_date || undefined,
+          short_code: new_short_code,
+          user: userInfo,
+        },
+        {
+          conflictPaths: ["short_code"],
+          skipUpdateIfNoValuesChanged: true,
+        }
+      );
 
-      await this.repository.save(newUrl);
       return new_short_code;
     } catch (err) {
       throw new Error(`Error creating short code: ${(err as Error).message}`);
@@ -133,7 +153,7 @@ class URLShortenerService {
         relations: ["user"],
       });
 
-      if (!row || row.deleted_at != null || row.expiry_date < new Date()) {
+      if (!row) {
         return null;
       }
 
@@ -143,29 +163,10 @@ class URLShortenerService {
     }
   }
 
-  async getOriginalURL(short_code: string): Promise<string | null> {
-    try {
-      await this.connectDB();
-      const url = await this.repository.findOne({
-        where: {
-          short_code: short_code,
-        },
-        select: {
-          original_url: true,
-        },
-      });
-
-      return url ? url.original_url : null;
-    } catch (err) {
-      throw new Error(`Error fetching original URL: ${(err as Error).message}`);
-    }
-  }
-
   async handleRedirect(short_code: string, api_key: string) {
     try {
       const row = await this.findOneRow(short_code, api_key);
-
-      if (!row || row.deleted_at) {
+      if (!row || (row.expiry_date != null && row.expiry_date < new Date())) {
         return null;
       }
 
@@ -185,12 +186,12 @@ class URLShortenerService {
       await this.connectDB();
 
       const row = await this.findOneRow(short_code, api_key);
-      if (!row) {
+      if (!row || (row.expiry_date != null && row.expiry_date < new Date())) {
         return null;
       }
 
       const res = await this.repository.update(row.id, {
-        deleted_at: new Date(),
+        expiry_date: new Date(),
       });
 
       return res.affected && res.affected > 0 ? row.short_code : null;
