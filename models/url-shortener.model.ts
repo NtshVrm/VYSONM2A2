@@ -19,6 +19,9 @@ export class URLShortener {
   @Column("text", { unique: true })
   short_code!: string;
 
+  @Column("text", { nullable: true, default: null })
+  password!: string | null;
+
   @Column("int", { default: 0 })
   visit_count!: number;
 
