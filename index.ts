@@ -28,9 +28,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         error: "You do not have access for this operation.",
       });
     }
+    next();
   })();
-
-  next();
 });
 
 app.get("/", (req, res) => {
@@ -69,13 +68,19 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
 
       const apiKey = req.headers["api-key"] as string;
 
-      let originalUrl = await URLShortenerManager.handleRedirect(
+      let redirectData = await URLShortenerManager.handleRedirect(
         shortcode,
         apiKey
       );
 
-      return originalUrl
-        ? res.status(302).redirect(originalUrl)
+      if (redirectData.original_url && redirectData.expired) {
+        return res
+          .status(410)
+          .json({ status: 410, error: "Short code has expired!" });
+      }
+
+      return redirectData.original_url
+        ? res.status(302).redirect(redirectData.original_url)
         : res.status(404).json(responseJson.shortCodeNotFound);
     } catch (err) {
       next(err);
@@ -232,12 +237,18 @@ app.delete("/delete", (req: Request, res: Response, next: NextFunction) => {
 
       const apiKey = req.headers["api-key"] as string;
 
-      const deletedShortCode = await URLShortenerManager.deleteShortCode(
+      const deletedObj = await URLShortenerManager.deleteShortCode(
         short_code,
         apiKey
       );
 
-      return short_code == deletedShortCode
+      if (deletedObj.short_code && deletedObj.expired) {
+        return res
+          .status(410)
+          .json({ status: 410, error: "Short code has expired!" });
+      }
+
+      return short_code == deletedObj.short_code
         ? res.status(200).json({
             statusCode: 200,
             message: `${short_code} deleted successfully!`,
