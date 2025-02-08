@@ -6,6 +6,7 @@ import { URLShortener } from "../models/url-shortener.model";
 
 const API_KEY = "test_api_key";
 const ENT_API_KEY = "ent_test_api_key";
+const LIST_API_KEY = "list_test_api_key";
 
 beforeAll(async () => {
   try {
@@ -165,17 +166,51 @@ describe("POST /shorten", () => {
     expect(response.body.expiry_date).toBeDefined();
     expect(response.body.expiry_date).toBe("2025-02-06T18:36:24.585Z");
   });
+
+  it("should create a new short code with a password", async () => {
+    const password = "securePassword";
+    const response = await request(app)
+      .post("/shorten")
+      .set("api-key", API_KEY)
+      .send({
+        long_url: original_url,
+        password: password,
+      });
+    short_code = response.body.short_code;
+
+    expect(response.status).toBe(201);
+    expect(response.body).toBeDefined();
+    expect(response.body.short_code).toBeDefined();
+    expect(response.body.short_code).not.toBeNull();
+    expect(response.body.short_code).not.toBe("");
+    expect(response.body.expiry_date).toBeDefined();
+    expect(response.body.expiry_date).toBe(null);
+  });
+
+  it("should return error if password is empty", async () => {
+    const response = await request(app)
+      .post("/shorten")
+      .set("api-key", API_KEY)
+      .send({
+        long_url: original_url,
+        password: "",
+      });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Password cannot be empty!");
+  });
 });
 
 describe("GET /redirect", () => {
   const original_url = "https://example.com";
   const short_code = "test123";
+  const password = "securePassword";
 
   beforeEach(async () => {
     // test URL to use for redirect tests
     await request(app).post("/shorten").set("api-key", API_KEY).send({
       long_url: original_url,
       custom_code: short_code,
+      password: password,
     });
   });
 
@@ -212,14 +247,6 @@ describe("GET /redirect", () => {
     expect(response.body.error).toBe("User does not exist.");
   });
 
-  it("should redirect to original URL if short code exists", async () => {
-    const response = await request(app)
-      .get(`/redirect?code=${short_code}`)
-      .set("api-key", API_KEY);
-    expect(response.status).toBe(302);
-    expect(response.header.location).toBe(original_url);
-  });
-
   it("should return 410 if URL has expired", async () => {
     // URL with expiry date in the past
     const expiredCode = "expired123";
@@ -234,6 +261,30 @@ describe("GET /redirect", () => {
       .set("api-key", API_KEY);
     expect(response.status).toBe(410);
     expect(response.body.error).toBe("Short code has expired!");
+  });
+
+  it("should return 403 if password is required but not provided", async () => {
+    const response = await request(app)
+      .get(`/redirect?code=${short_code}`)
+      .set("api-key", API_KEY);
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe("Needs a password to be accessed.");
+  });
+
+  it("should return 403 if the password is incorrect", async () => {
+    const response = await request(app)
+      .get(`/redirect?code=${short_code}&password=wrongPassword`)
+      .set("api-key", API_KEY);
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBe("The password is incorrect.");
+  });
+
+  it("should redirect to original URL if short code exists and password is correct", async () => {
+    const response = await request(app)
+      .get(`/redirect?code=${short_code}&password=${password}`)
+      .set("api-key", API_KEY);
+    expect(response.status).toBe(302);
+    expect(response.header.location).toBe(original_url);
   });
 });
 
@@ -323,6 +374,7 @@ describe("PUT /code/:shortCode", () => {
     await request(app).post("/shorten").set("api-key", API_KEY).send({
       long_url: original_url,
       custom_code: short_code,
+      password: "initialPassword",
     });
   });
 
@@ -363,6 +415,26 @@ describe("PUT /code/:shortCode", () => {
     expect(response.status).toBe(201);
     expect(response.body).toBeDefined();
     expect(response.body.short_code).toBe(short_code);
+  });
+
+  it("should successfully update password", async () => {
+    const newPassword = "newSecurePassword";
+    const response = await request(app)
+      .put(`/code/${short_code}`)
+      .set("api-key", API_KEY)
+      .send({ password: newPassword });
+    expect(response.status).toBe(201);
+    expect(response.body).toBeDefined();
+    expect(response.body.short_code).toBe(short_code);
+  });
+
+  it("should return error if password is empty when updating", async () => {
+    const response = await request(app)
+      .put(`/code/${short_code}`)
+      .set("api-key", API_KEY)
+      .send({ password: "" });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Password cannot be empty!");
   });
 });
 
@@ -423,5 +495,36 @@ describe("POST /shorten-bulk", () => {
     expect(response.body.error).toBe(
       "You do not have access for this operation."
     );
+  });
+
+  it("should successfully create multiple short codes with passwords", async () => {
+    const response = await request(app)
+      .post("/shorten-bulk")
+      .set("api-key", ENT_API_KEY)
+      .send({
+        long_urls: urls,
+        password: "bulkPassword",
+      });
+    expect(response.status).toBe(201);
+    expect(response.body).toBeDefined();
+    expect(response.body.batch).toBeInstanceOf(Array);
+    expect(response.body.batch).toHaveLength(urls.length);
+    response.body.batch.forEach((item: any, index: number) => {
+      expect(item.original_url).toBe(urls[index]);
+      expect(item.short_code).toBeDefined();
+      expect(item.short_code).not.toBeNull();
+    });
+  });
+
+  it("should return error if password is empty for bulk shorten", async () => {
+    const response = await request(app)
+      .post("/shorten-bulk")
+      .set("api-key", ENT_API_KEY)
+      .send({
+        long_urls: urls,
+        password: "",
+      });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Password cannot be empty!");
   });
 });
