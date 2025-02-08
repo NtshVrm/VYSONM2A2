@@ -34,11 +34,18 @@ class URLShortenerService {
     ).join("");
   }
 
-  async getAllUrls(): Promise<URLShortener[]> {
+  async getAllUrls(api_key: string): Promise<URLShortener[]> {
     try {
       await this.connectDB();
 
-      const urls = await this.repository.find();
+      const urls = await this.repository.find({
+        where: {
+          user: {
+            api_key: api_key,
+          },
+        },
+        relations: ["user"],
+      });
       return urls;
     } catch (err) {
       throw new Error(`Error fetching URL's: ${(err as Error).message}`);
@@ -110,6 +117,7 @@ class URLShortenerService {
       long_url: string;
       expiry_date: string | null;
       custom_code: string | null;
+      password: string | null;
     },
     api_key: string
   ): Promise<string | null> {
@@ -127,6 +135,7 @@ class URLShortenerService {
           original_url: dataObj.long_url,
           expiry_date: dataObj.expiry_date || undefined,
           short_code: new_short_code,
+          password: dataObj.password,
           user: userInfo,
         },
         {
@@ -167,7 +176,11 @@ class URLShortenerService {
     try {
       const row = await this.findOneRow(short_code, api_key);
       if (!row || (row.expiry_date != null && row.expiry_date < new Date())) {
-        return { original_url: row?.original_url, expired: true };
+        return {
+          original_url: row?.original_url,
+          password: row?.password,
+          expired: true,
+        };
       }
 
       const res = await this.repository.update(row.id, {
@@ -176,8 +189,12 @@ class URLShortenerService {
       });
 
       return res.affected && res.affected > 0
-        ? { original_url: row?.original_url, expired: false }
-        : { original_url: null, expired: false };
+        ? {
+            original_url: row?.original_url,
+            password: row?.password,
+            expired: false,
+          }
+        : { original_url: null, password: null, expired: false };
     } catch (err) {
       throw new Error(`Error redirecting: ${(err as Error).message}`);
     }
