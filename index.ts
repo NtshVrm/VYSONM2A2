@@ -36,10 +36,11 @@ app.get("/", (req, res) => {
   res.send("Hello");
 });
 
-app.get("/all", (req: Request, res: Response, next: NextFunction) => {
+app.get("/list", (req: Request, res: Response, next: NextFunction) => {
   (async () => {
     try {
-      const allData = await URLShortenerManager.getAllUrls();
+      const apiKey = req.headers["api-key"] as string;
+      const allData = await URLShortenerManager.getAllUrls(apiKey);
       return res.json(allData);
     } catch (err) {
       next(err);
@@ -62,6 +63,7 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
   (async () => {
     try {
       const shortcode = req.query.code as string | undefined;
+      const password = req.query.password as string | undefined;
       if (!shortcode) {
         return res.status(400).json(responseJson.shortCodeRequired);
       }
@@ -77,6 +79,26 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
         return res
           .status(410)
           .json({ status: 410, error: "Short code has expired!" });
+      }
+
+      if (
+        redirectData.original_url &&
+        redirectData.password &&
+        password == undefined
+      ) {
+        return res
+          .status(403)
+          .json({ status: 403, error: "Needs a password to be accessed." });
+      }
+
+      if (
+        redirectData.original_url &&
+        redirectData.password &&
+        password !== redirectData.password
+      ) {
+        return res
+          .status(403)
+          .json({ status: 403, error: "The password is incorrect." });
       }
 
       return redirectData.original_url
@@ -95,13 +117,20 @@ app.post("/shorten", (req: Request, res: Response, next: NextFunction) => {
         long_url,
         expiry_date,
         custom_code,
+        password,
       }: {
         long_url: string | null;
         expiry_date: string | null;
         custom_code: string | null;
+        password: string | null;
       } = req.body
         ? req.body
-        : { long_url: null, expiry_date: null, custom_code: null };
+        : {
+            long_url: null,
+            expiry_date: null,
+            custom_code: null,
+            password: null,
+          };
 
       const apiKey = req.headers["api-key"] as string;
 
@@ -116,6 +145,13 @@ app.post("/shorten", (req: Request, res: Response, next: NextFunction) => {
         return res.status(400).json({
           statusCode: 400,
           error: "Custom Code cannot be empty!",
+        });
+      }
+
+      if (password != null && password == "") {
+        return res.status(400).json({
+          statusCode: 400,
+          error: "Password cannot be empty!",
         });
       }
 
@@ -135,6 +171,7 @@ app.post("/shorten", (req: Request, res: Response, next: NextFunction) => {
           long_url: long_url,
           expiry_date: expiry_date,
           custom_code: custom_code,
+          password: password,
         },
         apiKey
       );
@@ -156,12 +193,21 @@ app.put(
       const shortCode = req.params.shortCode;
       const {
         expiry_date,
+        password,
       }: {
         expiry_date: string | null;
+        password: string | null;
       } = req.body ? req.body : { expiry_date: null };
 
       if (!shortCode) {
         return res.status(400).json(responseJson.shortCodeRequired);
+      }
+
+      if (password != null && password == "") {
+        return res.status(400).json({
+          statusCode: 400,
+          error: "Password cannot be empty!",
+        });
       }
 
       const apiKey = req.headers["api-key"] as string;
@@ -174,6 +220,7 @@ app.put(
             long_url: row?.original_url,
             custom_code: row?.short_code,
             expiry_date: expiry_date,
+            password: password,
           },
           apiKey
         );
@@ -193,8 +240,10 @@ app.post("/shorten-bulk", (req: Request, res: Response, next: NextFunction) => {
     try {
       const {
         long_urls,
+        password,
       }: {
         long_urls: string[] | [];
+        password: string | null;
       } = req.body ? req.body : { long_urls: [] };
 
       const apiKey = req.headers["api-key"] as string;
@@ -208,6 +257,13 @@ app.post("/shorten-bulk", (req: Request, res: Response, next: NextFunction) => {
         });
       }
 
+      if (password != null && password == "") {
+        return res.status(400).json({
+          statusCode: 400,
+          error: "Password cannot be empty!",
+        });
+      }
+
       batch = await Promise.all(
         long_urls.map(async (long_url) => {
           const newShortCode = await URLShortenerManager.createShortCode(
@@ -215,6 +271,7 @@ app.post("/shorten-bulk", (req: Request, res: Response, next: NextFunction) => {
               long_url,
               expiry_date: null,
               custom_code: null,
+              password: password,
             },
             apiKey
           );
