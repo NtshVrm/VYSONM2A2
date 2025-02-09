@@ -490,7 +490,7 @@ describe("POST /shorten-bulk", () => {
       .post("/shorten-bulk")
       .set("api-key", API_KEY)
       .send({ long_urls: urls });
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(403);
     expect(response.body).toBeDefined();
     expect(response.body.error).toBe(
       "You do not have access for this operation."

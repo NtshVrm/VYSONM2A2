@@ -21,7 +21,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     }
 
     if (req.url == "/shorten-bulk" && userInfo.tier != "enterprise") {
-      return res.status(400).json(responseJson.accessDenied);
+      return res.status(403).json(responseJson.accessDenied);
     }
     next();
   })();
@@ -70,10 +70,6 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
         apiKey
       );
 
-      if (redirectData.original_url && redirectData.expired) {
-        return res.status(410).json(responseJson.shortCodeExpired);
-      }
-
       if (
         redirectData.original_url &&
         redirectData.password &&
@@ -88,6 +84,10 @@ app.get("/redirect", (req: Request, res: Response, next: NextFunction) => {
         password !== redirectData.password
       ) {
         return res.status(403).json(responseJson.incorrectPassword);
+      }
+
+      if (redirectData.original_url && redirectData.expired) {
+        return res.status(410).json(responseJson.shortCodeExpired);
       }
 
       return redirectData.original_url
