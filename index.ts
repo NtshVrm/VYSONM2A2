@@ -27,7 +27,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   })();
 });
 
-app.get("/health", (req, res) => {
+app.get("/", (req, res) => {
   res.status(200).json({ status: 200 });
 });
 
