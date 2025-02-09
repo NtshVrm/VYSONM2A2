@@ -45,6 +45,7 @@ npm install
 Start the server:
 
 ```sh
+npm run build
 npm run start
 ```
 
